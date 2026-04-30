@@ -4,23 +4,23 @@
 
 Switch monitor refresh rates directly from the KDE system tray.
 
-> [!NOTE]
-> Tested on KDE Plasma 6.6 (Wayland). Should work on KDE 5 and X11 sessions as well.
-
 ![Screenshot](.github/assets/example.webp)
-
----
 
 ## Usage
 
 Click or right-click the monitor icon in your system tray. Each display appears as a submenu, select any mode to apply it immediately. Use the middle-click (e.g. the scroll wheel) to switch without opening the menu (only for the main screen).
 
-## Requirements
+## Setup
+
+#### Requirements
 
 - KDE Plasma 6 (Wayland or X11)
 - Fedora or any RPM-based distro
+- Python 3
 
-## Install
+The application has only been tested on KDE Plasma 6.6 (Wayland). Should work on KDE 5 and X11 sessions as well, but no guarantees.
+
+#### Installation
 
 It's pretty straight forward to set this up. As I currently have not set-up a deployment pipeline, you'll have to clone the repository and run `install.sh`:
 
@@ -30,15 +30,17 @@ cd kde-refresh-rate
 ./install.sh
 ```
 
-Note, the installation script installs `python3-pyqt6` and `kscreen`, makes the script executable, and registers it as a KDE autostart entry so it launches on every login.
+The installation script installs `python3-pyqt6` and `kscreen`, makes the script executable, and registers it as a KDE autostart entry so it launches on every login.
 
-## Manual setup
+#### Manual setup
 
 ```bash
 sudo dnf install python3-pyqt6 kscreen
 chmod +x refresh_rate_tray.py
 python3 refresh_rate_tray.py
 ```
+
+That's all.
 
 ## License
 
