@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import json
+import locale
 import os
 import signal
 import subprocess
@@ -15,6 +16,135 @@ from PyQt6.QtWidgets import (
     QMessageBox, QSystemTrayIcon, QVBoxLayout, QWidget,
 )
 
+# ── i18n ──────────────────────────────────────────────────────────────────────
+
+_TRANSLATIONS: dict[str, dict[str, str]] = {
+    "nl": {
+        "Refresh Rate Switcher":   "Refresh Rate Switcher",
+        "Screen":                  "Scherm",
+        "Main":                    "Hoofd",
+        "No displays found":       "Geen beeldschermen gevonden",
+        "kscreen-doctor not found — install: sudo dnf install kscreen":
+            "kscreen-doctor niet gevonden — installeer: sudo dnf install kscreen",
+        "Failed to parse kscreen-doctor output":
+            "Kan kscreen-doctor-uitvoer niet verwerken",
+        "kscreen-doctor timed out":    "kscreen-doctor time-out",
+        "kscreen-doctor error":        "kscreen-doctor fout",
+        "No system tray detected.":    "Geen systeemvak gevonden.",
+        "Error":                       "Fout",
+        "Quit":                        "Afsluiten",
+        "Exit the refresh rate switcher": "Ververssnelheid Switcher afsluiten",
+        "Primary display":             "Primair beeldscherm",
+        "Secondary display":           "Secundair beeldscherm",
+        "Current: {desc}":             "Huidig: {desc}",
+        "{width}×{height} at {rate} Hz": "{width}×{height} bij {rate} Hz",
+        "unknown":                     "onbekend",
+    },
+    "de": {
+        "Refresh Rate Switcher":   "Bildwiederholrate-Umschalter",
+        "Screen":                  "Bildschirm",
+        "Main":                    "Haupt",
+        "No displays found":       "Keine Bildschirme gefunden",
+        "kscreen-doctor not found — install: sudo dnf install kscreen":
+            "kscreen-doctor nicht gefunden — installieren: sudo dnf install kscreen",
+        "Failed to parse kscreen-doctor output":
+            "kscreen-doctor-Ausgabe konnte nicht verarbeitet werden",
+        "kscreen-doctor timed out":    "kscreen-doctor-Zeitüberschreitung",
+        "kscreen-doctor error":        "kscreen-doctor-Fehler",
+        "No system tray detected.":    "Kein Systembereich gefunden.",
+        "Error":                       "Fehler",
+        "Quit":                        "Beenden",
+        "Exit the refresh rate switcher": "Bildwiederholrate-Umschalter beenden",
+        "Primary display":             "Primärer Bildschirm",
+        "Secondary display":           "Sekundärer Bildschirm",
+        "Current: {desc}":             "Aktuell: {desc}",
+        "{width}×{height} at {rate} Hz": "{width}×{height} bei {rate} Hz",
+        "unknown":                     "unbekannt",
+    },
+    "it": {
+        "Refresh Rate Switcher":   "Cambio frequenza di aggiornamento",
+        "Screen":                  "Schermo",
+        "Main":                    "Principale",
+        "No displays found":       "Nessun display trovato",
+        "kscreen-doctor not found — install: sudo dnf install kscreen":
+            "kscreen-doctor non trovato — installa: sudo dnf install kscreen",
+        "Failed to parse kscreen-doctor output":
+            "Impossibile analizzare l'output di kscreen-doctor",
+        "kscreen-doctor timed out":    "kscreen-doctor: timeout",
+        "kscreen-doctor error":        "Errore kscreen-doctor",
+        "No system tray detected.":    "Nessun vassoio di sistema rilevato.",
+        "Error":                       "Errore",
+        "Quit":                        "Esci",
+        "Exit the refresh rate switcher": "Esci dal cambio frequenza di aggiornamento",
+        "Primary display":             "Display principale",
+        "Secondary display":           "Display secondario",
+        "Current: {desc}":             "Corrente: {desc}",
+        "{width}×{height} at {rate} Hz": "{width}×{height} a {rate} Hz",
+        "unknown":                     "sconosciuto",
+    },
+    "pl": {
+        "Refresh Rate Switcher":   "Refresh Rate Switcher",
+        "Screen":                  "Ekran",
+        "Main":                    "Główny",
+        "No displays found":       "Nie znaleziono wyświetlaczy",
+        "kscreen-doctor not found — install: sudo dnf install kscreen":
+            "Nie znaleziono kscreen-doctor — zainstaluj: sudo dnf install kscreen",
+        "Failed to parse kscreen-doctor output":
+            "Nie udało się przetworzyć danych kscreen-doctor",
+        "kscreen-doctor timed out":    "Przekroczono czas oczekiwania kscreen-doctor",
+        "kscreen-doctor error":        "Błąd kscreen-doctor",
+        "No system tray detected.":    "Nie wykryto zasobnika systemowego.",
+        "Error":                       "Błąd",
+        "Quit":                        "Wyjdź",
+        "Exit the refresh rate switcher": "Zamknij przełącznik częstotliwości odświeżania",
+        "Primary display":             "Główny wyświetlacz",
+        "Secondary display":           "Dodatkowy wyświetlacz",
+        "Current: {desc}":             "Bieżący: {desc}",
+        "{width}×{height} at {rate} Hz": "{width}×{height} przy {rate} Hz",
+        "unknown":                     "nieznany",
+    },
+    "es": {
+        "Refresh Rate Switcher":   "Refresh Rate Switcher",
+        "Screen":                  "Pantalla",
+        "Main":                    "Principal",
+        "No displays found":       "No se encontraron pantallas",
+        "kscreen-doctor not found — install: sudo dnf install kscreen":
+            "kscreen-doctor no encontrado — instala: sudo dnf install kscreen",
+        "Failed to parse kscreen-doctor output":
+            "Error al analizar la salida de kscreen-doctor",
+        "kscreen-doctor timed out":    "kscreen-doctor agotó el tiempo de espera",
+        "kscreen-doctor error":        "error de kscreen-doctor",
+        "No system tray detected.":    "No se detectó bandeja del sistema.",
+        "Error":                       "Error",
+        "Quit":                        "Salir",
+        "Exit the refresh rate switcher": "Salir del conmutador de frecuencia de actualización",
+        "Primary display":             "Pantalla principal",
+        "Secondary display":           "Pantalla secundaria",
+        "Current: {desc}":             "Actual: {desc}",
+        "{width}×{height} at {rate} Hz": "{width}×{height} a {rate} Hz",
+        "unknown":                     "desconocido",
+    },
+}
+
+
+def _make_translator() -> dict[str, str]:
+    try:
+        lang = (
+            locale.getlocale()[0]
+            or os.environ.get("LANG", "")
+            or os.environ.get("LANGUAGE", "")
+        )
+        code = lang.split("_")[0].split(".")[0].lower()
+        return _TRANSLATIONS.get(code, {})
+    except Exception:
+        return {}
+
+
+_T: dict[str, str] = _make_translator()
+
+
+def _(text: str) -> str:
+    return _T.get(text, text)
 
 @dataclass
 class Mode:
@@ -51,8 +181,8 @@ class Display:
 
     @property
     def menu_label(self) -> str:
-        suffix = "  [Main]    " if self.is_main else ""
-        return f"Screen {self.index}: {self.name}{suffix}"
+        suffix = f"  [{_('Main')}]    " if self.is_main else ""
+        return f"{_('Screen')} {self.index}: {self.name}{suffix}"
 
 
 def query_displays() -> tuple[list[Display], Optional[str]]:
@@ -62,7 +192,7 @@ def query_displays() -> tuple[list[Display], Optional[str]]:
             capture_output=True, text=True, timeout=5,
         )
         if result.returncode != 0:
-            return [], result.stderr.strip() or "kscreen-doctor error"
+            return [], result.stderr.strip() or _("kscreen-doctor error")
 
         data = json.loads(result.stdout)
         enabled = [o for o in data.get("outputs", []) if o.get("enabled", False)]
@@ -101,11 +231,11 @@ def query_displays() -> tuple[list[Display], Optional[str]]:
         return displays, None
 
     except FileNotFoundError:
-        return [], "kscreen-doctor not found — install: sudo dnf install kscreen"
+        return [], _("kscreen-doctor not found — install: sudo dnf install kscreen")
     except json.JSONDecodeError:
-        return [], "Failed to parse kscreen-doctor output"
+        return [], _("Failed to parse kscreen-doctor output")
     except subprocess.TimeoutExpired:
-        return [], "kscreen-doctor timed out"
+        return [], _("kscreen-doctor timed out")
     except Exception as e:
         return [], str(e)
 
@@ -214,14 +344,15 @@ class RefreshRateTray:
         self._sig: list = []
         self._osd = OsdOverlay()
 
-        self.tray = QSystemTrayIcon()
-        self.tray.setIcon(self._find_icon())
-        self.tray.setToolTip("Refresh Rate Switcher")
-        self.tray.activated.connect(self._on_activated)
-
         self.menu = QMenu()
         self.menu.setStyleSheet("QMenu::item { padding-right: 28px; }")
+        self.menu.setToolTipsVisible(True)
+
+        self.tray = QSystemTrayIcon()
+        self.tray.setIcon(self._find_icon())
+        self.tray.setToolTip(_("Refresh Rate Switcher"))
         self.tray.setContextMenu(self.menu)
+        self.tray.activated.connect(self._on_activated)
 
         self._setup_watcher()
 
@@ -301,21 +432,41 @@ class RefreshRateTray:
         displays, error = query_displays()
 
         if error or not displays:
-            a = QAction(error or "No displays found", self.menu)
+            msg = error or _("No displays found")
+            a = QAction(msg, self.menu)
             a.setEnabled(False)
             self.menu.addAction(a)
+            self.tray.setToolTip(_("Refresh Rate Switcher") + "\n" + msg)
         else:
             self._sig = [(d.name, d.current_mode_id, len(d.modes)) for d in displays]
+            subtext_lines = []
             for display in displays:
                 self._build_display_menu(display)
+                current = next((m for m in display.modes if m.id == display.current_mode_id), None)
+                if current:
+                    subtext_lines.append(f"{display.name}: {current.label}")
+            tooltip = _("Refresh Rate Switcher")
+            if subtext_lines:
+                tooltip += "\n" + " · ".join(subtext_lines)
+            self.tray.setToolTip(tooltip)
 
         self.menu.addSeparator()
-        quit_action = QAction("Quit", self.menu)
+        quit_action = QAction(_("Quit"), self.menu)
+        quit_action.setToolTip(_("Exit the refresh rate switcher"))
         quit_action.triggered.connect(self.app.quit)
         self.menu.addAction(quit_action)
 
     def _build_display_menu(self, display: Display) -> None:
         submenu = self.menu.addMenu(display.menu_label)
+        submenu.setToolTipsVisible(True)
+
+        current_mode = next((m for m in display.modes if m.id == display.current_mode_id), None)
+        current_desc = current_mode.label if current_mode else _("unknown")
+        role = _("Primary display") if display.is_main else _("Secondary display")
+        submenu.menuAction().setToolTip(
+            f"{role}: {display.name}\n" + _("Current: {desc}").format(desc=current_desc)
+        )
+
         group = QActionGroup(submenu)
         group.setExclusive(True)
 
@@ -323,6 +474,12 @@ class RefreshRateTray:
             action = QAction(mode.label, submenu)
             action.setCheckable(True)
             action.setChecked(mode.id == display.current_mode_id)
+            exact_rate = f"{mode.refresh_rate:.4f}".rstrip("0").rstrip(".")
+            action.setToolTip(
+                _("{width}×{height} at {rate} Hz").format(
+                    width=mode.width, height=mode.height, rate=exact_rate,
+                )
+            )
             action.triggered.connect(self._make_handler(display.name, mode, display.current_mode_id))
             group.addAction(action)
             submenu.addAction(action)
@@ -346,7 +503,7 @@ def main() -> None:
     signal.signal(signal.SIGINT, lambda *_: app.quit())
 
     if not QSystemTrayIcon.isSystemTrayAvailable():
-        QMessageBox.critical(None, "Error", "No system tray detected.")
+        QMessageBox.critical(None, _("Error"), _("No system tray detected."))
         sys.exit(1)
 
     _tray = RefreshRateTray(app)
