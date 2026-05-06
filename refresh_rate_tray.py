@@ -495,7 +495,7 @@ class RefreshRateTray:
             a = QAction(msg, self.menu)
             a.setEnabled(False)
             self.menu.addAction(a)
-            self.tray.setToolTip(_("Refresh Rate Switcher") + "\n" + msg)
+            self.tray.setToolTip(_("Refresh Rate") + "\n" + msg)
         else:
             self._sig = [(d.name, d.current_mode_id, len(d.modes)) for d in displays]
             subtext_lines = []
@@ -504,9 +504,18 @@ class RefreshRateTray:
                 current = next((m for m in display.modes if m.id == display.current_mode_id), None)
                 if current:
                     subtext_lines.append(f"{display.name}: {current.label}")
-            tooltip = _("Refresh Rate Switcher")
+            active_profile = self._current_profile(displays)
+            if active_profile == "performance":
+                profile_label = _("Performance")
+            elif active_profile == "energy":
+                profile_label = _("Energy saving")
+            else:
+                profile_label = _("Custom")
+
+            tooltip = _("Refresh Rate")
             if subtext_lines:
                 tooltip += "\n" + " · ".join(subtext_lines)
+            tooltip += f"\n{profile_label}"
             self.tray.setToolTip(tooltip)
 
         self.menu.addSeparator()
