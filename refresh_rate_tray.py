@@ -39,6 +39,10 @@ _TRANSLATIONS: dict[str, dict[str, str]] = {
         "Current: {desc}":             "Huidig: {desc}",
         "{width}×{height} at {rate} Hz": "{width}×{height} bij {rate} Hz",
         "unknown":                     "onbekend",
+        "Profiles":                    "Profielen",
+        "Performance":                 "Prestaties",
+        "Energy saving":               "Energiezuinig",
+        "Custom":                      "Aangepast",
     },
     "de": {
         "Refresh Rate Switcher":   "Bildwiederholrate-Umschalter",
@@ -60,6 +64,10 @@ _TRANSLATIONS: dict[str, dict[str, str]] = {
         "Current: {desc}":             "Aktuell: {desc}",
         "{width}×{height} at {rate} Hz": "{width}×{height} bei {rate} Hz",
         "unknown":                     "unbekannt",
+        "Profiles":                    "Profile",
+        "Performance":                 "Leistung",
+        "Energy saving":               "Energiesparmodus",
+        "Custom":                      "Benutzerdefiniert",
     },
     "it": {
         "Refresh Rate Switcher":   "Cambio frequenza di aggiornamento",
@@ -81,6 +89,10 @@ _TRANSLATIONS: dict[str, dict[str, str]] = {
         "Current: {desc}":             "Corrente: {desc}",
         "{width}×{height} at {rate} Hz": "{width}×{height} a {rate} Hz",
         "unknown":                     "sconosciuto",
+        "Profiles":                    "Profili",
+        "Performance":                 "Prestazioni",
+        "Energy saving":               "Risparmio energetico",
+        "Custom":                      "Personalizzato",
     },
     "pl": {
         "Refresh Rate Switcher":   "Refresh Rate Switcher",
@@ -102,6 +114,10 @@ _TRANSLATIONS: dict[str, dict[str, str]] = {
         "Current: {desc}":             "Bieżący: {desc}",
         "{width}×{height} at {rate} Hz": "{width}×{height} przy {rate} Hz",
         "unknown":                     "nieznany",
+        "Profiles":                    "Profile",
+        "Performance":                 "Wydajność",
+        "Energy saving":               "Oszczędzanie energii",
+        "Custom":                      "Niestandardowy",
     },
     "es": {
         "Refresh Rate Switcher":   "Refresh Rate Switcher",
@@ -123,6 +139,10 @@ _TRANSLATIONS: dict[str, dict[str, str]] = {
         "Current: {desc}":             "Actual: {desc}",
         "{width}×{height} at {rate} Hz": "{width}×{height} a {rate} Hz",
         "unknown":                     "desconocido",
+        "Profiles":                    "Perfiles",
+        "Performance":                 "Rendimiento",
+        "Energy saving":               "Ahorro de energía",
+        "Custom":                      "Personalizado",
     },
 }
 
@@ -397,22 +417,61 @@ class RefreshRateTray:
         except TypeError:
             pass  # PyQt6 enum conversion can fail during shutdown
 
-    def _cycle_mode(self) -> None:
-        displays, _ = query_displays()
-        if len(displays) != 1:
+    @staticmethod
+    def _get_highest_rate_mode(display: Display) -> Optional[Mode]:
+        if not display.modes:
+            return None
+        return display.modes[0]  # sorted by (res, rate) desc
+
+    @staticmethod
+    def _get_lowest_rate_mode(display: Display) -> Optional[Mode]:
+        if not display.modes:
+            return None
+        best_res = display.modes[0].width * display.modes[0].height
+        native = [m for m in display.modes if m.width * m.height == best_res]
+        return min(native, key=lambda m: m.refresh_rate)
+
+    def _current_profile(self, displays: list[Display]) -> Optional[str]:
+        if not displays:
+            return None
+        if all(
+            (m := self._get_highest_rate_mode(d)) is not None and d.current_mode_id == m.id
+            for d in displays
+        ):
+            return "performance"
+        if all(
+            (m := self._get_lowest_rate_mode(d)) is not None and d.current_mode_id == m.id
+            for d in displays
+        ):
+            return "energy"
+        return None
+
+    def _apply_profile(self, profile: str) -> None:
+        displays, _err = query_displays()
+        if not displays:
             return
-        display = displays[0]
-        if len(display.modes) < 2:
-            return
-        current_idx = next(
-            (i for i, m in enumerate(display.modes) if m.id == display.current_mode_id),
-            0,
-        )
-        next_mode = display.modes[(current_idx + 1) % len(display.modes)]
-        apply_mode(display.name, next_mode.id)
-        # Delay OSD until after the screen flash
+        for display in displays:
+            mode = (
+                self._get_highest_rate_mode(display)
+                if profile == "performance"
+                else self._get_lowest_rate_mode(display)
+            )
+            if mode and mode.id != display.current_mode_id:
+                apply_mode(display.name, mode.id)
+        label = _("Performance") if profile == "performance" else _("Energy saving")
         QTimer.singleShot(self._APPLY_DELAY_MS, self.rebuild_menu)
-        QTimer.singleShot(self._APPLY_DELAY_MS, lambda: self._osd.show_rate(next_mode.rate_label, display.name))
+        QTimer.singleShot(self._APPLY_DELAY_MS, lambda: self._osd.show_rate(label))
+
+    def _cycle_mode(self) -> None:
+        displays, _err = query_displays()
+        if not displays:
+            return
+        # Toggle: all at max → switch to energy saving, otherwise → performance
+        all_max = all(
+            (m := self._get_highest_rate_mode(d)) is not None and d.current_mode_id == m.id
+            for d in displays
+        )
+        self._apply_profile("energy" if all_max else "performance")
 
     def _on_fs_change(self, path: str = "") -> None:
         if os.path.isdir(path):
@@ -449,6 +508,36 @@ class RefreshRateTray:
             if subtext_lines:
                 tooltip += "\n" + " · ".join(subtext_lines)
             self.tray.setToolTip(tooltip)
+
+        self.menu.addSeparator()
+        profiles_menu = self.menu.addMenu(_("Profiles"))
+        profiles_menu.setToolTipsVisible(True)
+
+        active_profile = self._current_profile(displays if not error and displays else [])
+
+        profile_group = QActionGroup(profiles_menu)
+        profile_group.setExclusive(True)
+
+        perf_action = QAction(_("Performance"), profiles_menu)
+        perf_action.setCheckable(True)
+        perf_action.setChecked(active_profile == "performance")
+        perf_action.triggered.connect(lambda: self._apply_profile("performance"))
+        profile_group.addAction(perf_action)
+        profiles_menu.addAction(perf_action)
+
+        energy_action = QAction(_("Energy saving"), profiles_menu)
+        energy_action.setCheckable(True)
+        energy_action.setChecked(active_profile == "energy")
+        energy_action.triggered.connect(lambda: self._apply_profile("energy"))
+        profile_group.addAction(energy_action)
+        profiles_menu.addAction(energy_action)
+
+        custom_action = QAction(_("Custom"), profiles_menu)
+        custom_action.setCheckable(True)
+        custom_action.setChecked(active_profile is None)
+        custom_action.setEnabled(False)
+        profile_group.addAction(custom_action)
+        profiles_menu.addAction(custom_action)
 
         self.menu.addSeparator()
         quit_action = QAction(_("Quit"), self.menu)
