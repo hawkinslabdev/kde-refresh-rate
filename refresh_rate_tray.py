@@ -40,9 +40,10 @@ _TRANSLATIONS: dict[str, dict[str, str]] = {
         "{width}×{height} at {rate} Hz": "{width}×{height} bij {rate} Hz",
         "unknown":                     "onbekend",
         "Profiles":                    "Profielen",
-        "Performance":                 "Prestaties",
-        "Energy saving":               "Energiezuinig",
+        "Performance":                 "Prestatie",
+        "Energy saving":               "Besparing",
         "Custom":                      "Aangepast",
+        "Mode":                        "Modus",
     },
     "de": {
         "Refresh Rate Switcher":   "Bildwiederholrate-Umschalter",
@@ -68,6 +69,7 @@ _TRANSLATIONS: dict[str, dict[str, str]] = {
         "Performance":                 "Leistung",
         "Energy saving":               "Energiesparmodus",
         "Custom":                      "Benutzerdefiniert",
+        "Mode":                        "Modus",
     },
     "it": {
         "Refresh Rate Switcher":   "Cambio frequenza di aggiornamento",
@@ -93,6 +95,7 @@ _TRANSLATIONS: dict[str, dict[str, str]] = {
         "Performance":                 "Prestazioni",
         "Energy saving":               "Risparmio energetico",
         "Custom":                      "Personalizzato",
+        "Mode":                        "Modalità",
     },
     "pl": {
         "Refresh Rate Switcher":   "Refresh Rate Switcher",
@@ -118,6 +121,7 @@ _TRANSLATIONS: dict[str, dict[str, str]] = {
         "Performance":                 "Wydajność",
         "Energy saving":               "Oszczędzanie energii",
         "Custom":                      "Niestandardowy",
+        "Mode":                        "Tryb",
     },
     "es": {
         "Refresh Rate Switcher":   "Refresh Rate Switcher",
@@ -143,6 +147,7 @@ _TRANSLATIONS: dict[str, dict[str, str]] = {
         "Performance":                 "Rendimiento",
         "Energy saving":               "Ahorro de energía",
         "Custom":                      "Personalizado",
+        "Mode":                        "Modo",
     },
 }
 
@@ -450,17 +455,21 @@ class RefreshRateTray:
         displays, _err = query_displays()
         if not displays:
             return
+        rate_parts = []
         for display in displays:
             mode = (
                 self._get_highest_rate_mode(display)
                 if profile == "performance"
                 else self._get_lowest_rate_mode(display)
             )
-            if mode and mode.id != display.current_mode_id:
-                apply_mode(display.name, mode.id)
-        label = _("Performance") if profile == "performance" else _("Energy saving")
+            if mode:
+                if mode.id != display.current_mode_id:
+                    apply_mode(display.name, mode.id)
+                rate_parts.append(mode.rate_label)
+        profile_name = _("Performance") if profile == "performance" else _("Energy saving")
+        sub = " · ".join(rate_parts)
         QTimer.singleShot(self._APPLY_DELAY_MS, self.rebuild_menu)
-        QTimer.singleShot(self._APPLY_DELAY_MS, lambda: self._osd.show_rate(label))
+        QTimer.singleShot(self._APPLY_DELAY_MS, lambda: self._osd.show_rate(profile_name, sub))
 
     def _cycle_mode(self) -> None:
         displays, _err = query_displays()
