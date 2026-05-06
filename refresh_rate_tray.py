@@ -376,7 +376,6 @@ class RefreshRateTray:
         self.tray = QSystemTrayIcon()
         self.tray.setIcon(self._find_icon())
         self.tray.setToolTip(_("Refresh Rate Switcher"))
-        self.tray.setContextMenu(self.menu)
         self.tray.activated.connect(self._on_activated)
 
         self._setup_watcher()
@@ -393,6 +392,7 @@ class RefreshRateTray:
         self._poll.start()
 
         self.rebuild_menu()
+        self.tray.setContextMenu(self.menu)
         self.tray.show()
 
     def _find_icon(self) -> QIcon:
